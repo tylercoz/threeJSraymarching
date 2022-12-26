@@ -30,25 +30,55 @@ const plane = new THREE.Mesh(
      },
     vertexShader:
       `
-      varying vec3 vUv; 
 
       void main() {
-        vUv = position; 
-
         vec4 modelViewPosition = modelViewMatrix * vec4(position, 1.0);
         gl_Position = projectionMatrix * modelViewPosition; 
       }
     `,
     fragmentShader:
     `
-      varying vec3 vUv;
       uniform vec2 resolution;
-      vec2 col;
+      vec3 col;
+
+      const int MAXSTEPS = 100;
+      const float MINDISTANCE = .01;
+      const float MAXDISTANCE = 1000.;
+
+      float SDFsphere(vec3 ray, vec4 circle) {
+        return length(circle.xyz - ray) - circle.w;
+      }
+
+      float distToScene(vec3 p) {
+        //SCENE
+        //the 4th argument represents the radius
+        vec4 circle = vec4(0., 0., 0., .2);
+        return SDFsphere(p, circle);
+      }
+
+      vec3 raymarch(vec3 ray) {
+        for (int i = 0; i < MAXSTEPS; i++) {
+          float distance = distToScene(ray);
+          if (distance < MINDISTANCE) {
+            return ray;
+          }
+          ray *= length(distance);
+        }
+        //return black
+        return vec3(0.);
+      }
 
       void main() {
-        //uv coords range from 0. to 1.
-        vec2 uv = vec2(vUv) + vec2(.5);
-        gl_FragColor = vec4(uv, 0., 1.0);
+        col = vec3(0.);
+        //x: 0. -> 2., y: 0. -> 1.
+        vec2 uv = (gl_FragCoord.xy / resolution.y);
+
+        vec3 camera = vec3(1., .5, 5.);
+        vec3 ray = vec3(vec2(uv.xy - camera.xy), .01);
+
+        ray = raymarch(ray);
+
+        gl_FragColor = vec4(ray, 1.0);
       }
     `,
   })
@@ -71,7 +101,7 @@ else {
 camera.updateProjectionMatrix();
 
 /** CONTROLS */
-const controls = new OrbitControls(camera, renderer.domElement);
+// const controls = new OrbitControls(camera, renderer.domElement);
 
 /** ANIMATE */
 function animate() {
